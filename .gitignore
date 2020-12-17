@@ -6,6 +6,9 @@ __pycache__/
 # Vscode workspaces
 *.code-workspace
 
+# App configuration
+ek50.config
+
 # C extensions
 *.so
 
