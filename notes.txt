@@ -1,0 +1,51 @@
+mido provides a callback-based API which will invoke the callback from a different thread. Your implementation of the callback can communicate with asyncio by calling loop.call_soon_threadsafe. Note that you won't be able to just set the value of a Future because the callback will be called multiple times, and a future can only be set once - it is meant for one-shot computations.
+
+A common pattern for multiply invoked callbacks is to push events onto an asyncio queue and pop stuff from it in asyncio code. This can be made even more convenient by exposing the queue as an async iterator. This function automates the process:
+
+def make_stream():
+    loop = asyncio.get_event_loop()
+    queue = asyncio.Queue()
+    def callback(message):
+        loop.call_soon_threadsafe(queue.put_nowait, message)
+    async def stream():
+        while True:
+            yield await queue.get()
+    return callback, stream()
+make_stream returns two objects:
+
+a callback, which you can pass to mido.open_input()
+a stream, which you can iterate with async for to get new messages
+Whenever the callback is invoked by mido in its background thread, your asyncio async for loop iterating over the stream will wake up with a new item. Effectively, make_stream converts a threaded callback into an async iterator. For example (untested):
+
+async def print_messages():
+    # create a callback/stream pair and pass callback to mido
+    cb, stream = make_stream()
+    mido.open_input(callback=cb)
+
+    # print messages as they come just by reading from stream
+    async for message in stream:
+        print(message)
+
+
+https://mido.readthedocs.io/en/latest/ports.html#callbacks
+
+---------------------
+
+model = self.combobox_1.get_model()
+        index = self.combobox_1.get_active()
+        liststore = self.combobox_2.get_model()
+        liststore.clear()
+        liststore.append(['Select:'])
+        if model[index][0] == 'C1':
+            liststore.append(['2'])
+            liststore.append(['3'])
+            liststore.append(['4'])
+        if model[index][0] == 'C2':
+            liststore.append(['2'])
+            liststore.append(['3'])
+            liststore.append(['4'])
+            liststore.append(['6'])
+        self.combobox_2.set_model(liststore)
+        self.combobox_2.set_active(0)
+
+--------------------------

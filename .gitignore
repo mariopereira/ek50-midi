@@ -8,6 +8,7 @@ __pycache__/
 
 # App configuration
 ek50.config
+notex.txt
 
 # C extensions
 *.so

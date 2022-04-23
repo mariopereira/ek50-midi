@@ -15,11 +15,11 @@ class Application(Gtk.Window):
         Gtk.Window.set_default_size(self, 1000, 500)
         Gtk.Window.maximize(self)
 
+        self.midi = ek50midi.Ek50Midi()
+
         self.init_config()
         self.create_controls()
         self.layout_app()
-
-        self.midi = ek50midi.Ek50Midi()
 
         msb, lsb, pc = self.configuration.get_default_sound()
 
@@ -30,12 +30,12 @@ class Application(Gtk.Window):
     def init_config(self):
         """Application configuration initialization"""
         self.currentCategory = None
-        self.configuration = ek50config.Ek50Config()
+        self.configuration = ek50config.Ek50Config(self)
         self.configuration.save()
 
 
     def create_controls(self):
-        """Creates all needed controls"""
+        """Create all needed controls"""
         self.buttonQuit = Gtk.ToolButton.new(Gtk.Image.new_from_icon_name('application-exit', Gtk.IconSize.DIALOG))
         self.buttonQuit.set_vexpand(True)
         self.buttonQuit.set_hexpand(True)
@@ -145,15 +145,6 @@ class Application(Gtk.Window):
             self.buttonsFavSet[n].set_hexpand(True)
             self.buttonsFavSet[n].connect('clicked', self.on_favourite_set, n)
 
-        self.comboCategories = Gtk.ComboBox.new_with_model(ek50data.categories)
-        self.comboCategories.set_vexpand(True)
-        self.comboCategories.set_hexpand(True)
-        renderer = Gtk.CellRendererText()
-        self.comboCategories.pack_start(renderer, True)
-        self.comboCategories.add_attribute(renderer, 'text', 0)
-        self.comboCategories.connect('changed', self.on_category_changed)
-        self.comboCategories.set_active(0)
-
         self.soundFilter = ek50data.sounds.filter_new()
         self.soundFilter.set_visible_func(self.sounds_filter_func)
 
@@ -170,25 +161,81 @@ class Application(Gtk.Window):
         self.soundViewScrollable = Gtk.ScrolledWindow()
         self.soundViewScrollable.set_vexpand(True)
 
+        self.comboCategories = Gtk.ComboBox.new_with_model(ek50data.categories)
+        self.comboCategories.set_vexpand(True)
+        self.comboCategories.set_hexpand(True)
+        renderer = Gtk.CellRendererText()
+        self.comboCategories.pack_start(renderer, True)
+        self.comboCategories.add_attribute(renderer, 'text', 0)
+        self.comboCategories.connect('changed', self.on_category_changed)
+        self.comboCategories.set_active(0)
+
+        self.inputList = Gtk.ListStore(str)
+
+        for device in self.midi.input_list():
+            self.inputList.append([device])
+
+        self.outputList = Gtk.ListStore(str)
+
+        for device in self.midi.output_list():
+            self.outputList.append([device])
+
+        self.comboInputDevice = Gtk.ComboBox.new_with_model(self.inputList)
+        renderer = Gtk.CellRendererText()
+        self.comboInputDevice.pack_start(renderer, True)
+        self.comboInputDevice.add_attribute(renderer, 'text', 0)
+        self.comboInputDevice.connect('changed', self.on_input_device_changed)
+
+        self.comboOutputDevice = Gtk.ComboBox.new_with_model(self.outputList)
+        renderer = Gtk.CellRendererText()
+        self.comboOutputDevice.pack_start(renderer, True)
+        self.comboOutputDevice.add_attribute(renderer, 'text', 0)
+        self.comboOutputDevice.connect('changed', self.on_output_device_changed)
+
+        channels = Gtk.ListStore(int)
+        for ch in range(1, 17):
+            channels.append([ch])
+
+        self.comboInputChannel = Gtk.ComboBox.new_with_model(channels)
+        renderer = Gtk.CellRendererText()
+        self.comboInputChannel.pack_start(renderer, True)
+        self.comboInputChannel.add_attribute(renderer, 'text', 0)
+        self.comboInputChannel.connect('changed', self.on_input_channel_changed)
+
+        channels = Gtk.ListStore(int)
+        for ch in range(1, 17):
+            channels.append([ch])
+
+        self.comboOutputChannel = Gtk.ComboBox.new_with_model(channels)
+        renderer = Gtk.CellRendererText()
+        self.comboOutputChannel.pack_start(renderer, True)
+        self.comboOutputChannel.add_attribute(renderer, 'text', 0)
+        self.comboOutputChannel.connect('changed', self.on_output_channel_changed)
+
+        self.buttonRefreshDevices = Gtk.ToolButton.new(label = 'Refresh Devices')
+        self.buttonRefreshDevices.connect('clicked', self.on_refresh_devices)
+
 
     def layout_app(self):
-        """Creates the application layout"""
+        """Create the application layout"""
         self.notebook = Gtk.Notebook()
         self.add(self.notebook)
 
         page1 = self.layout_page1()
         page2 = self.layout_page2()
         page3 = self.layout_page3()
+        pageConfig = self.layout_page_config()
 
         self.notebook.append_page(page1, Gtk.Label(label = 'Sounds'))
         self.notebook.append_page(page2, Gtk.Label(label = 'Favourites'))
         self.notebook.append_page(page3, Gtk.Label(label = 'Set Favourite'))
+        self.notebook.append_page(pageConfig, Gtk.Label(label = 'Configuration'))
 
         self.show_all()
 
 
     def layout_page1(self):
-        """Creates the main page and returns it"""
+        """Create the main page"""
         grid = Gtk.Grid()
         grid.column_homogenous = True
         grid.row_homogenous = True
@@ -224,7 +271,7 @@ class Application(Gtk.Window):
 
 
     def layout_page2(self):
-        """Creates the favourites page and return it"""
+        """Creats the favourites page"""
         grid = Gtk.Grid()
         grid.column_homogenous = True
         grid.row_homogenous = True
@@ -249,7 +296,7 @@ class Application(Gtk.Window):
 
 
     def layout_page3(self):
-        """Create the set favourites page and return it"""
+        """Create the set favourites page"""
         grid = Gtk.Grid()
         grid.column_homogenous = True
         grid.row_homogenous = True
@@ -265,6 +312,26 @@ class Application(Gtk.Window):
                 index = (row * cols) + col
 
                 grid.attach(self.buttonsFavSet[index], col, row, 1, 1)
+
+        return grid
+
+
+    def layout_page_config(self):
+        """Create the configuration page"""
+        grid = Gtk.Grid()
+        grid.set_row_spacing(15)
+        grid.set_column_spacing(10)
+        grid.set_border_width(10)
+
+        grid.attach(Gtk.Label(label = 'Input Device'), 0, 0, 1, 1)
+        grid.attach(self.comboInputDevice, 1, 0, 1, 1)
+        grid.attach(self.comboInputChannel, 2, 0, 1, 1)
+
+        grid.attach(Gtk.Label(label = 'Output Device'), 0, 1, 1, 1)
+        grid.attach(self.comboOutputDevice, 1, 1, 1, 1)
+        grid.attach(self.comboOutputChannel, 2, 1, 1, 1)
+
+        grid.attach(self.buttonRefreshDevices, 1, 2, 1, 1)
 
         return grid
 
@@ -374,7 +441,7 @@ class Application(Gtk.Window):
         self.sound_scroll_to_selection()
 
     def on_category_changed(self, combo):
-        """Called when the user selects another category"""
+        """Change the current category displayed"""
         treeIter = combo.get_active_iter()
 
         if treeIter is None:
@@ -383,6 +450,7 @@ class Application(Gtk.Window):
 
         model = combo.get_model()
         self.currentCategory = model[treeIter][0]
+
         self.soundFilter.refilter()
         self.sound_select_first()
 
@@ -631,6 +699,39 @@ class Application(Gtk.Window):
 
         self.buttonFavs[index].set_label(sound)
         self.buttonsFavSet[index].set_label('Set fav #' + str(index) + ' (*)')
+
+
+    def on_input_device_changed(self, combo):
+        """Change the input device"""
+        #treeIter = combo.get_active_iter()
+
+        #if treeIter is None:
+        #    self.currentCategory = None
+        #    return
+
+        #model = combo.get_model()
+        #self.currentCategory = model[treeIter][0]
+        pass
+
+
+    def on_output_device_changed(self, combo):
+        """Change the output device"""
+        pass
+
+
+    def on_input_channel_changed(self, combo):
+        """Change the input channel"""
+        pass
+
+
+    def on_output_channel_changed(self, combo):
+        """Change the output channel"""
+        pass
+
+
+    def on_refresh_devices(self, button):
+        """Refresh the input and output lists"""
+        pass
 
 
 

@@ -1,8 +1,10 @@
 import configparser
 
 class Ek50Config:
-    def __init__(self):
+    def __init__(self, app):
         """Initialization"""
+        self.application = app
+
         self.config_location = 'ek50.config'
         self.default_fav_rows = 5
         self.default_fav_cols = 4
@@ -22,6 +24,14 @@ class Ek50Config:
                 'current_msb': '0',
                 'current_lsb': '0',
                 'current_pc': '0'
+            },
+            'input': {
+                'device': '',
+                'channel': -1
+            },
+            'output': {
+                'device': '',
+                'channel': -1
             }
         })
 
@@ -30,6 +40,48 @@ class Ek50Config:
         """Saves the current configuration"""
         with open(self.config_location, 'w') as configfile:
             self.config.write(configfile)
+
+    def valid_device(self, type, device):
+        """Check if the device is a valid input or output device"""
+        if not type in ['input', 'output']:
+            return False
+
+        if type == 'input':
+            return self.application.midi.valid_input_device(device)
+
+        return self.application.midi.valid_output_device(device)
+
+    def get_device(self, type):
+        """Get the input or output device and channel"""
+        if not type in ['input', 'output']:
+            return [None, None]
+
+        device = self.config[type].get('device')
+        channel = self.config[type].getint('channel')
+
+        if not self.valid_device(device):
+            return [None, None]
+
+        if not self.application.midi.valid_channel(channel):
+            return [None, None]
+
+        return [device, channel]
+
+
+    def set_device(self, type, device, channel):
+        """Set the input or output device and channel"""
+        if not type in ['input', 'output']:
+            return False
+
+        if not self.valid_device(type, device):
+            return False
+
+        if not self.application.midi.valid_channel(channel):
+            return False
+
+        self.config[type]['device'] = device
+        self.config[type]['channel'] = str(channel)
+        self.save()
 
 
     def get_default_sound(self):
