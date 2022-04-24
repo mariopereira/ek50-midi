@@ -3,8 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Vscode workspaces
+# Vscode workspaces and runners
 *.code-workspace
+tempCodeRunnerFile.py
 
 # App configuration
 ek50.config

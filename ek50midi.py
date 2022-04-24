@@ -9,6 +9,8 @@ class Ek50Midi:
         """Initialize class"""
         mido.Backend('mido.backends.rtmidi')
 
+        self.defaultOutputMatch = 'EK-50'
+
         self.input = None
         self.inputChannel = -1
 
@@ -16,28 +18,32 @@ class Ek50Midi:
         self.outputChannel = 4
 
 
-    def adjust_device_list(self, devices):
-        """Removes the device id from the device name"""
-        ret = []
-
-        for p in devices:
-            parts = p.split()
-            parts.pop()
-            ret.append(' '.join(parts))
-
-        return ret
-
-
     def output_list(self):
         """Get the names of the output devices found"""
         outputs = mido.get_output_names()
-        return self.adjust_device_list(outputs)
+
+        # remove duplicates
+        outputs = list(dict.fromkeys(outputs))
+
+        return outputs
 
 
     def input_list(self):
         """Get the names of the input devices found"""
         inputs = mido.get_input_names()
-        return self.adjust_device_list(inputs)
+
+        # remove duplicates
+        inputs = list(dict.fromkeys(inputs))
+        return inputs
+
+    def get_default_output(self):
+        """Get the default output device (EK-50)"""
+        result = list(filter(lambda x: self.defaultOutputMatch in x, self.output_list()))
+
+        if len(result) >= 1:
+            return result[0]
+
+        return ''
 
 
     def valid_input_device(self, device):
@@ -67,11 +73,14 @@ class Ek50Midi:
         return channel >= 0 and channel <= 15
 
 
-    def open_output(self, device = 'EK-50:EK-50 MIDI 1'):
+    def open_output(self, device = ''):
         """Open the output device"""
         if self.output is not None:
             self.close_output()
             self.output = None
+
+        if len(device) == 0:
+            device = self.get_default_output()
 
         if device not in self.output_list():
             return False
